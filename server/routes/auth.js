@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const User = require('../models/User');
-const bcrypt = require('bcryptjs'); // Needed for password comparison
-const jwt = require('jsonwebtoken'); // Needed for session management
+const CryptoJS = require('crypto-js'); // Use Crypto-JS for comparison
+const jwt = require('jsonwebtoken'); 
 
 // REGISTER
 router.post('/register', async (req, res) => {
@@ -18,7 +18,7 @@ router.post('/register', async (req, res) => {
             if (role === 'responder' && secretKey !== RESPONDER_SECRET) return res.status(403).json({ message: "Invalid Responder Code" });
         }
 
-        // Mongoose pre-save hook in User.js will hash the password now
+        // The User model pre-save hook will handle hashing the raw password
         const newUser = new User({ name, email, password, role, phone, vehicleNumber });
         await newUser.save();
         
@@ -29,7 +29,7 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// LOGIN (SECURE VERSION)
+// LOGIN (STABLE VERSION)
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -37,16 +37,18 @@ router.post('/login', async (req, res) => {
         
         if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
-        // 1. Compare hashed password
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+        // 1. Hash the incoming password for comparison
+        const incomingHash = CryptoJS.SHA256(password).toString();
+        
+        // 2. Compare the hashes
+        if (incomingHash !== user.password) return res.status(400).json({ message: "Invalid credentials" });
 
-        // 2. Generate JWT Token
+        // 3. Generate JWT Token
         const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET || 'your_default_secret', { expiresIn: '1h' });
 
         res.json({ 
             success: true, 
-            token, // Return the token the frontend expects
+            token,
             user: { 
                 id: user._id, 
                 name: user.name, 
