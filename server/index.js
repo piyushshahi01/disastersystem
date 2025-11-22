@@ -11,12 +11,18 @@ const sosRoutes = require('./routes/sos');
 const Sos = require('./models/SOS');
 const User = require('./models/User'); 
 const Message = require('./models/Message'); 
-const MissingPerson = require('./models/MissingPerson'); // IMPORT MISSING PERSON MODEL
+const MissingPerson = require('./models/MissingPerson'); 
 
 dotenv.config();
 const app = express();
 
-app.use(cors());
+// --- FIX 1: ALLOW ALL ORIGINS FOR API CALLS ---
+app.use(cors({
+  origin: "*", // Allow connections from Vercel, Localhost, Mobile, etc.
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
+
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
@@ -28,8 +34,13 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.error("❌ MongoDB Error:", err));
 
 const server = http.createServer(app);
+
+// --- FIX 2: ALLOW ALL ORIGINS FOR SOCKET.IO ---
 const io = new Server(server, {
-  cors: { origin: "http://localhost:5173", methods: ["GET", "POST"] }
+  cors: { 
+    origin: "*", // Allow Socket connections from anywhere
+    methods: ["GET", "POST"] 
+  }
 });
 
 const sendMockSMS = (name, phone, message) => {
@@ -99,7 +110,6 @@ io.on('connection', (socket) => {
           }
       } catch (err) { console.error(err); }
   });
-  // -----------------------------------
 
   socket.on('volunteer_status_change', async ({ userId, isVolunteer }) => {
       await User.findByIdAndUpdate(userId, { isVolunteer });
