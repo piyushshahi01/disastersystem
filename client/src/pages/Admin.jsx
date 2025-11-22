@@ -57,22 +57,37 @@ const Admin = () => {
 
     const fetchShelters = async () => {
       try {
-        const res = await axios.get(`${BACKEND_URL}/api/shelters`); // FIXED URL
-        setShelters(res.data.map(s => ({ id: s._id, name: s.name, lat: s.location?.lat, lng: s.location?.lng, capacity: s.capacity })));
+        const res = await axios.get(`${BACKEND_URL}/api/shelters`);
+        // FIX: Check if data is an array before mapping!
+        if (Array.isArray(res.data)) {
+            setShelters(res.data.map(s => ({ id: s._id, name: s.name, lat: s.location?.lat, lng: s.location?.lng, capacity: s.capacity })));
+        } else {
+            console.error("Shelters API did not return an array:", res.data);
+            setShelters([]);
+        }
       } catch (err) { console.error("Error loading shelters:", err); }
     };
     fetchShelters();
 
     const fetchAlerts = async () => {
         try {
-            const res = await axios.get(`${BACKEND_URL}/api/sos`); // FIXED URL
-            setAlerts(res.data);
-        } catch(err) { console.log("Error fetching alerts", err); }
+            const res = await axios.get(`${BACKEND_URL}/api/sos`);
+            // FIX: Check if data is an array before setting state!
+            if (Array.isArray(res.data)) {
+                setAlerts(res.data);
+            } else {
+                 console.error("Alerts API did not return an array:", res.data);
+                 setAlerts([]);
+            }
+        } catch(err) { console.log("Error fetching alerts:", err); setAlerts([]); }
     };
     fetchAlerts();
 
     socket.on('new_shelter', (data) => setShelters(prev => [...prev, { id: data._id, name: data.name, lat: data.lat, lng: data.lng, capacity: data.capacity }]));
-    socket.on('shelter_updated', (data) => { const u = data.updatedShelter || data; setShelters(prev => prev.map(s => s.id === u._id ? { ...s, name: u.name, capacity: u.capacity } : s)); });
+    socket.on('shelter_updated', (data) => { 
+        const u = data.updatedShelter || data; 
+        setShelters(prev => prev.map(s => s.id === u._id ? { ...s, name: u.name, capacity: u.capacity } : s)); 
+    });
     socket.on('shelter_deleted', (data) => setShelters(prev => prev.filter(s => s.id !== (data.id || data))));
     socket.on('new_sos', (data) => setAlerts((prev) => [data, ...prev]));
     
@@ -81,7 +96,17 @@ const Admin = () => {
         if (status === 'resolved' && activeChatSosId === sosId) setActiveChatSosId(null);
     });
 
-    const fetchResponders = async () => { try { const res = await axios.get(`${BACKEND_URL}/api/auth/responders`); setRealResponders(res.data); } catch (err) { console.log(err); } }; // FIXED URL
+    const fetchResponders = async () => { 
+        try { 
+            const res = await axios.get(`${BACKEND_URL}/api/auth/responders`); 
+            if (Array.isArray(res.data)) {
+                setRealResponders(res.data);
+            } else {
+                 console.error("Responders API did not return an array:", res.data);
+                 setRealResponders([]);
+            }
+        } catch (err) { console.log("Error fetching responders:", err); setRealResponders([]); }
+    };
     fetchResponders();
 
     return () => { 
@@ -90,9 +115,8 @@ const Admin = () => {
     };
   }, [activeChatSosId]);
 
-  // FIX: CRUD HANDLERS USE TEMPLATE LITERALS FOR ID
-  const handleEditShelter = async (id, data) => { await axios.put(`${BACKEND_URL}/api/shelters/${id}`, data); }; 
-  const handleDeleteShelter = async (id) => { await axios.delete(`${BACKEND_URL}/api/shelters/${id}`); }; 
+  const handleEditShelter = async (id, data) => { await axios.put(`${BACKEND_URL}/api/shelters/${id}`, data); };
+  const handleDeleteShelter = async (id) => { await axios.delete(`${BACKEND_URL}/api/shelters/${id}`); };
   const handleDeleteSOS = async (id) => { if(window.confirm("Force delete?")) { try { setAlerts(prev => prev.filter(a => a._id !== id)); socket.emit('resolve_sos', { sosId: id }); } catch (err) { console.error(err); } } };
 
   const handleMapClick = (latlng) => {
@@ -127,7 +151,7 @@ const Admin = () => {
           <SidebarItem icon={<BarChart3 size={20}/>} label="Analytics" active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} />
         </nav>
 
-        {/* LIVE FEED */}
+        {/* LIVE FEED (SIDEBAR) */}
         <div className="flex-1 overflow-y-auto p-4 border-t border-gray-700 bg-gray-900/30">
             <div className="flex justify-between items-center mb-3">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Live Feed</h3>
