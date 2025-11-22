@@ -1,14 +1,13 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { motion, AnimatePresence } from 'framer-motion';
-import io from 'socket.io-client';
 import axios from 'axios';
 import { MapPin, Navigation, CheckCircle, ShieldAlert, Phone, Truck, Radio, Clock, User, Shield, Target, LogOut } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import ChatWindow from '../components/ChatWindow'; 
-import Loader from '../components/Loader'; // IMPORT LOADER
-
-import { socket } from '../socket';
+import Loader from '../components/Loader'; 
+import { socket, BACKEND_URL } from '../socket'; // IMPORT SOCKET & URL
 
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
     if (!lat1 || !lon1 || !lat2 || !lon2) return null;
@@ -21,7 +20,7 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
 }
 
 const Responder = () => {
-  const [isLoading, setIsLoading] = useState(true); // LOADING STATE
+  const [isLoading, setIsLoading] = useState(true);
   const [alerts, setAlerts] = useState([]);
   const [myId, setMyId] = useState(localStorage.getItem('userId'));
   const [activeSOSId, setActiveSOSId] = useState(null);
@@ -34,7 +33,7 @@ const Responder = () => {
 
     const fetchProfile = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/auth/responders');
+        const res = await axios.get(`${BACKEND_URL}/api/auth/responders`); // USE BACKEND_URL
         const me = res.data.find(u => u._id === myId);
         setMyProfile(me);
       } catch (err) { console.error(err); }
@@ -43,7 +42,7 @@ const Responder = () => {
 
     const fetchAlerts = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/sos');
+        const res = await axios.get(`${BACKEND_URL}/api/sos`); // USE BACKEND_URL
         setAlerts(res.data.filter(a => a && a.user));
       } catch (err) { console.error(err); }
     };

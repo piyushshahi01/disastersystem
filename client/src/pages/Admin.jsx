@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Circle } from 'react-leaflet';
 import { motion } from 'framer-motion';
-import io from 'socket.io-client';
 import axios from 'axios';
 import { Bell, Map, Users, AlertTriangle, Shield, Home, Target, Plus, Trash2, Phone, BarChart3, Edit3, X, LogOut, MessageSquare, Flame, CheckCircle } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
@@ -9,8 +8,7 @@ import ChatWindow from '../components/ChatWindow';
 import Analytics from '../components/Analytics'; 
 import HeatmapLayer from '../components/HeatmapLayer'; 
 import Loader from '../components/Loader';
-
-import { socket } from '../socket';
+import { socket, BACKEND_URL } from '../socket'; // IMPORT SOCKET & URL
 
 // --- Helper Component for Editing Shelters ---
 const ShelterEditModal = ({ shelter, onClose, onSave, onDelete }) => {
@@ -51,7 +49,6 @@ const Admin = () => {
   const [activeChatSosId, setActiveChatSosId] = useState(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
 
-  // --- DERIVED STATE ---
   const activeAlerts = alerts.filter(a => a.status !== 'resolved');
   const resolvedCount = alerts.filter(a => a.status === 'resolved').length;
 
@@ -60,7 +57,7 @@ const Admin = () => {
 
     const fetchShelters = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/shelters');
+        const res = await axios.get(`${BACKEND_URL}/api/shelters`);
         setShelters(res.data.map(s => ({ id: s._id, name: s.name, lat: s.location?.lat, lng: s.location?.lng, capacity: s.capacity })));
       } catch (err) { console.error("Error loading shelters:", err); }
     };
@@ -68,8 +65,7 @@ const Admin = () => {
 
     const fetchAlerts = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/sos');
-            // Store ALL data to calculate "Solved" count
+            const res = await axios.get(`${BACKEND_URL}/api/sos`);
             setAlerts(res.data);
         } catch(err) { console.log("Error fetching alerts", err); }
     };
@@ -81,12 +77,11 @@ const Admin = () => {
     socket.on('new_sos', (data) => setAlerts((prev) => [data, ...prev]));
     
     socket.on('sos_status_update', ({ sosId, status, responderId }) => {
-        // Update status in the main list instead of removing it
         setAlerts(prev => prev.map(a => a._id === sosId ? { ...a, status: status, assignedTo: responderId } : a));
         if (status === 'resolved' && activeChatSosId === sosId) setActiveChatSosId(null);
     });
 
-    const fetchResponders = async () => { try { const res = await axios.get('http://localhost:5000/api/auth/responders'); setRealResponders(res.data); } catch (err) { console.log(err); } };
+    const fetchResponders = async () => { try { const res = await axios.get(`${BACKEND_URL}/api/auth/responders`); setRealResponders(res.data); } catch (err) { console.log(err); } };
     fetchResponders();
 
     return () => { 
@@ -95,8 +90,8 @@ const Admin = () => {
     };
   }, [activeChatSosId]);
 
-  const handleEditShelter = async (id, data) => { await axios.put(`http://localhost:5000/api/shelters/${id}`, data); };
-  const handleDeleteShelter = async (id) => { await axios.delete(`http://localhost:5000/api/shelters/${id}`); };
+  const handleEditShelter = async (id, data) => { await axios.put(`${BACKEND_URL}/api/shelters/${id}`, data); };
+  const handleDeleteShelter = async (id) => { await axios.delete(`${BACKEND_URL}/api/shelters/${id}`); };
   const handleDeleteSOS = async (id) => { if(window.confirm("Force delete?")) { try { setAlerts(prev => prev.filter(a => a._id !== id)); socket.emit('resolve_sos', { sosId: id }); } catch (err) { console.error(err); } } };
 
   const handleMapClick = (latlng) => {
@@ -131,7 +126,7 @@ const Admin = () => {
           <SidebarItem icon={<BarChart3 size={20}/>} label="Analytics" active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} />
         </nav>
 
-        {/* LIVE FEED (Sidebar) */}
+        {/* LIVE FEED (SIDEBAR) */}
         <div className="flex-1 overflow-y-auto p-4 border-t border-gray-700 bg-gray-900/30">
             <div className="flex justify-between items-center mb-3">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Live Feed</h3>
@@ -162,8 +157,6 @@ const Admin = () => {
 
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col overflow-hidden bg-gray-900">
-        
-        {/* STATS HEADER */}
         <div className="bg-gray-900 p-6 shadow-md grid grid-cols-4 gap-6 border-b border-gray-800">
           <StatCard title="Total Solved" value={resolvedCount} color="text-green-500" icon={<CheckCircle/>} />
           <StatCard title="Active SOS" value={activeAlerts.filter(a => a.type === 'EMERGENCY').length} color="text-red-500" icon={<AlertTriangle/>} />
@@ -172,8 +165,6 @@ const Admin = () => {
         </div>
 
         <div className="flex-1 p-6 overflow-hidden">
-          
-          {/* --- TAB: LIVE MAP (SPLIT VIEW RESTORED) --- */}
           {activeTab === 'map' && (
             <div className="flex gap-6 h-full">
               <div className="flex-2 w-2/3 bg-gray-800 rounded-2xl shadow-xl border border-gray-700 overflow-hidden relative">
@@ -208,7 +199,6 @@ const Admin = () => {
                 {mapMode === 'shelter' && <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-2 rounded-full shadow-lg z-[1000] font-bold animate-pulse">🏠 Add Safe Shelter</div>}
               </div>
 
-              {/* RIGHT: CONTROLS (1/3) - RESTORED */}
               <div className="flex-1 w-1/3 flex flex-col gap-6">
                 <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-gray-800 p-6 rounded-2xl shadow-xl border border-gray-700">
                   <h3 className="font-bold text-blue-400 mb-4 flex items-center gap-2"><Bell size={20}/> Disaster Broadcast</h3>
@@ -224,7 +214,7 @@ const Admin = () => {
                 </motion.div>
                 <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
                   <h3 className="font-bold text-blue-400 mb-4 flex items-center gap-2"><Home size={20}/> Shelter Quick Add</h3>
-                  <button onClick={() => setMapMode('shelter')} className={`w-full p-3 rounded border-2 font-bold flex items-center justify-center gap-2 ${mapMode==='shelter'?'border-green-500 text-green-400':'border-gray-700 text-gray-400'}`}><Plus size={20}/> Click Map to Add</button>
+                  <button onClick={() => setMapMode('shelter')} className={`w-full p-3 rounded border-2 font-bold flex items-center justify-center gap-2 ${mapMode==='shelter'?'border-green-500 text-green-400':'border-gray-700 text-gray-400'}`}><Plus size={20}/> Add Shelter</button>
                 </div>
               </div>
             </div>
@@ -232,7 +222,6 @@ const Admin = () => {
 
           {activeChatSosId && (<div className="absolute bottom-4 right-4 z-[2000]"><ChatWindow socket={socket} sosId={activeChatSosId} userName="Admin HQ" role="admin" /></div>)}
 
-          {/* --- TAB: SHELTERS (RESTORED TABLE UI) --- */}
           {activeTab === 'shelters' && (
              <div className="bg-gray-800 p-6 rounded-xl h-full overflow-y-auto">
                 <h2 className="text-xl font-bold text-blue-400 mb-4">Shelters List</h2>
@@ -250,11 +239,11 @@ const Admin = () => {
              </div>
           )}
           
-          {/* --- TAB: RESPONDERS --- */}
           {activeTab === 'responders' && (<div className="bg-gray-800 p-6 rounded-xl h-full overflow-y-auto"><h2 className="text-xl font-bold text-green-400 mb-4">Responders</h2><table className="w-full text-left"><thead><tr className="border-b border-gray-700 text-gray-400"><th className="p-3">Name</th><th className="p-3">Contact</th><th className="p-3">Vehicle</th><th className="p-3">Status</th></tr></thead><tbody>{realResponders.map(r => (<tr key={r._id} className="border-b border-gray-700 hover:bg-gray-700/50 transition"><td className="p-3 font-bold text-white">{r.name}</td><td className="p-3 text-blue-400 flex items-center gap-1"><Phone size={14}/> {r.phone || "N/A"}</td><td className="p-3 text-gray-500">{r.vehicleNumber || "N/A"}</td><td className="p-3"><span className="bg-green-600/30 text-green-400 px-2 py-1 rounded text-xs font-bold">Ready</span></td></tr>))}</tbody></table></div>)}
           
-          {/* --- TAB: ANALYTICS --- */}
-          {activeTab === 'analytics' && <Analytics alerts={alerts} shelters={shelters} responders={realResponders} />}
+          {activeTab === 'analytics' && (
+              <Analytics alerts={alerts} shelters={shelters} responders={realResponders} />
+          )}
         </div>
       </div>
     </div>

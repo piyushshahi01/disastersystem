@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import io from 'socket.io-client';
 import axios from 'axios';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import { AlertTriangle, Map as MapIcon, Phone, ShieldCheck, X, Navigation, Camera, Check, Home, Stethoscope, Siren, LogOut, FileText, Hand, UserPlus, Users, MessageCircle, Search, Plus, BedDouble } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import ChatWindow from '../components/ChatWindow';
-import Loader from '../components/Loader'; // IMPORT LOADER
-
-import { socket } from '../socket';
+import Loader from '../components/Loader'; 
+import { socket, BACKEND_URL } from '../socket'; // IMPORT SOCKET & URL
 
 const responderIcon = new L.Icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/2555/2555013.png', iconSize: [45, 45], iconAnchor: [22, 22], popupAnchor: [0, -20] });
 const userIcon = new L.Icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/149/149071.png', iconSize: [35, 35], iconAnchor: [17, 17], popupAnchor: [0, -15] });
@@ -17,7 +15,7 @@ const shelterIcon = new L.Icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/51
 const medicalIcon = new L.Icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/4006/4006511.png', iconSize: [35, 35], iconAnchor: [17, 17], popupAnchor: [0, -15] });
 
 const Citizen = () => {
-  const [isLoading, setIsLoading] = useState(true); // LOADING STATE
+  const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState('map');
   const [sosData, setSosData] = useState({ description: '', location: null, image: null });
   const [status, setStatus] = useState('idle'); 
@@ -36,27 +34,21 @@ const Citizen = () => {
   const [loadingLoc, setLoadingLoc] = useState(false);
   const [isVolunteer, setIsVolunteer] = useState(false);
   const [activeSosId, setActiveSosId] = useState(null); 
-  
-  // Missing Persons
   const [missingPeople, setMissingPeople] = useState([]);
   const [showReportMissing, setShowReportMissing] = useState(false);
   const [missingForm, setMissingForm] = useState({ name: '', age: '', lastSeen: '', description: '', image: null });
   const [commentText, setCommentText] = useState("");
   const [activeCommentId, setActiveCommentId] = useState(null);
-
-  // Booking
   const [bookingShelter, setBookingShelter] = useState(null);
   const [bedsToBook, setBedsToBook] = useState(1);
 
   useEffect(() => {
-    // SIMULATE LOADING
     const timer = setTimeout(() => setIsLoading(false), 2000);
-
     const userId = localStorage.getItem('userId');
     const saved = JSON.parse(localStorage.getItem('emergencyContacts') || '[]');
     setContacts(saved);
 
-    axios.get('http://localhost:5000/api/shelters').then(res => {
+    axios.get(`${BACKEND_URL}/api/shelters`).then(res => { // USE BACKEND_URL
          const formatted = res.data.map(s => ({ id: s._id, name: s.name, lat: s.location.lat, lng: s.location.lng, type: s.type || 'shelter', capacity: s.capacity }));
          if (!formatted.find(r => r.type === 'medical')) formatted.push({ id: 'demo-hospital', name: 'City General Hospital', lat: 28.58, lng: 77.32, type: 'medical' });
          setResources(formatted);
@@ -78,7 +70,7 @@ const Citizen = () => {
     const checkActiveSOS = async () => {
       if(!userId) return;
       try {
-        const res = await axios.get('http://localhost:5000/api/sos');
+        const res = await axios.get(`${BACKEND_URL}/api/sos`); // USE BACKEND_URL
         const myAlert = res.data.find(a => a?.user?._id === userId && a.status !== 'resolved');
         if (myAlert) {
           setStatus('sent');
@@ -130,7 +122,6 @@ const Citizen = () => {
     if (file) reader.readAsDataURL(file);
   };
 
-  // --- MISSING PERSON HANDLERS ---
   const handleMissingImage = (e) => {
       const file = e.target.files[0];
       const reader = new FileReader();
@@ -210,7 +201,7 @@ const Citizen = () => {
       setContacts(updated);
       setNewContact({ name: '', phone: '' });
       localStorage.setItem('emergencyContacts', JSON.stringify(updated));
-      try { await axios.put(`http://localhost:5000/api/auth/update-contacts/${userId}`, { contacts: updated }); alert("Contact Added & Synced!"); } 
+      try { await axios.put(`${BACKEND_URL}/api/auth/update-contacts/${userId}`, { contacts: updated }); alert("Contact Added & Synced!"); } // USE BACKEND_URL
       catch(err) { console.error(err); alert("Saved locally only."); }
   };
 

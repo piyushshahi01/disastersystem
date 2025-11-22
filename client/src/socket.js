@@ -1,7 +1,6 @@
 import io from 'socket.io-client';
 
-// If we are in production, use the deployed backend URL. 
-// If on localhost, use port 5000.
-const URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+// Automatically detects if we are on localhost or deployed
+export const BACKEND_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
 
-export const socket = io.connect(URL);
+export const socket = io.connect(BACKEND_URL);
