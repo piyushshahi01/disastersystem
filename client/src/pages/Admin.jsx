@@ -57,7 +57,7 @@ const Admin = () => {
 
     const fetchShelters = async () => {
       try {
-        const res = await axios.get(`${BACKEND_URL}/api/shelters`);
+        const res = await axios.get(`${BACKEND_URL}/api/shelters`); // FIXED URL
         setShelters(res.data.map(s => ({ id: s._id, name: s.name, lat: s.location?.lat, lng: s.location?.lng, capacity: s.capacity })));
       } catch (err) { console.error("Error loading shelters:", err); }
     };
@@ -65,7 +65,7 @@ const Admin = () => {
 
     const fetchAlerts = async () => {
         try {
-            const res = await axios.get(`${BACKEND_URL}/api/sos`);
+            const res = await axios.get(`${BACKEND_URL}/api/sos`); // FIXED URL
             setAlerts(res.data);
         } catch(err) { console.log("Error fetching alerts", err); }
     };
@@ -81,7 +81,7 @@ const Admin = () => {
         if (status === 'resolved' && activeChatSosId === sosId) setActiveChatSosId(null);
     });
 
-    const fetchResponders = async () => { try { const res = await axios.get(`${BACKEND_URL}/api/auth/responders`); setRealResponders(res.data); } catch (err) { console.log(err); } };
+    const fetchResponders = async () => { try { const res = await axios.get(`${BACKEND_URL}/api/auth/responders`); setRealResponders(res.data); } catch (err) { console.log(err); } }; // FIXED URL
     fetchResponders();
 
     return () => { 
@@ -90,8 +90,9 @@ const Admin = () => {
     };
   }, [activeChatSosId]);
 
-  const handleEditShelter = async (id, data) => { await axios.put(`${BACKEND_URL}/api/shelters/${id}`, data); };
-  const handleDeleteShelter = async (id) => { await axios.delete(`${BACKEND_URL}/api/shelters/${id}`); };
+  // FIX: CRUD HANDLERS USE TEMPLATE LITERALS FOR ID
+  const handleEditShelter = async (id, data) => { await axios.put(`${BACKEND_URL}/api/shelters/${id}`, data); }; 
+  const handleDeleteShelter = async (id) => { await axios.delete(`${BACKEND_URL}/api/shelters/${id}`); }; 
   const handleDeleteSOS = async (id) => { if(window.confirm("Force delete?")) { try { setAlerts(prev => prev.filter(a => a._id !== id)); socket.emit('resolve_sos', { sosId: id }); } catch (err) { console.error(err); } } };
 
   const handleMapClick = (latlng) => {
@@ -126,7 +127,7 @@ const Admin = () => {
           <SidebarItem icon={<BarChart3 size={20}/>} label="Analytics" active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} />
         </nav>
 
-        {/* LIVE FEED (SIDEBAR) */}
+        {/* LIVE FEED */}
         <div className="flex-1 overflow-y-auto p-4 border-t border-gray-700 bg-gray-900/30">
             <div className="flex justify-between items-center mb-3">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Live Feed</h3>
@@ -157,6 +158,8 @@ const Admin = () => {
 
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col overflow-hidden bg-gray-900">
+        
+        {/* STATS HEADER */}
         <div className="bg-gray-900 p-6 shadow-md grid grid-cols-4 gap-6 border-b border-gray-800">
           <StatCard title="Total Solved" value={resolvedCount} color="text-green-500" icon={<CheckCircle/>} />
           <StatCard title="Active SOS" value={activeAlerts.filter(a => a.type === 'EMERGENCY').length} color="text-red-500" icon={<AlertTriangle/>} />
@@ -165,6 +168,8 @@ const Admin = () => {
         </div>
 
         <div className="flex-1 p-6 overflow-hidden">
+          
+          {/* --- TAB: LIVE MAP (SPLIT VIEW RESTORED) --- */}
           {activeTab === 'map' && (
             <div className="flex gap-6 h-full">
               <div className="flex-2 w-2/3 bg-gray-800 rounded-2xl shadow-xl border border-gray-700 overflow-hidden relative">
