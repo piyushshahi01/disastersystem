@@ -56,7 +56,20 @@ const Citizen = () => {
 
     socket.emit('get_missing_people');
 
-    socket.on('new_shelter', (data) => { setResources(prev => [...prev, { ...data, type: 'shelter' }]); });
+   socket.on('new_shelter', (data) => {
+  setResources(prev => [
+    ...prev,
+    {
+      id: data._id,                                      // ✅ use Mongo _id as id
+      name: data.name,
+      lat: data.location?.lat ?? data.lat,              // support both shapes
+      lng: data.location?.lng ?? data.lng,
+      type: data.type || 'shelter',
+      capacity: data.capacity,
+    },
+  ]);
+});
+
     socket.on('shelter_updated', (updatedShelter) => {
         setResources(prev => prev.map(r => r.id === updatedShelter._id ? { ...r, capacity: updatedShelter.capacity } : r));
     });
