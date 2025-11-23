@@ -14,13 +14,14 @@ import {
   User,
   Shield,
   Target,
-  LogOut
+  LogOut,
 } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import ChatWindow from '../components/ChatWindow';
 import Loader from '../components/Loader';
-import { socket, BACKEND_URL } from '../socket';
+import { socket, BACKEND_URL } from '../socket'; // IMPORT SOCKET & URL
 
+// --- Distance helper ---
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
   const R = 6371;
@@ -39,15 +40,17 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
 const Responder = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [alerts, setAlerts] = useState([]);
-  const [myId, setMyId] = useState(localStorage.getItem('userId'));
+  const [myId] = useState(localStorage.getItem('userId'));
   const [activeSOSId, setActiveSOSId] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
   const [myLocation, setMyLocation] = useState(null);
+  const [missingPeople, setMissingPeople] = useState([]); // 👈 NEW: store missing persons
   const watchId = useRef(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 2000);
 
+    // ---- Profile ----
     const fetchProfile = async () => {
       try {
         const res = await axios.get(`${BACKEND_URL}/api/auth/responders`);
@@ -59,6 +62,7 @@ const Responder = () => {
     };
     fetchProfile();
 
+    // ---- SOS alerts ----
     const fetchAlerts = async () => {
       try {
         const res = await axios.get(`${BACKEND_URL}/api/sos`);
@@ -69,10 +73,12 @@ const Responder = () => {
     };
     fetchAlerts();
 
+    // New SOS coming in
     socket.on('new_sos', (data) => {
       if (data && data.user) setAlerts((prev) => [data, ...prev]);
     });
 
+    // Status change (assigned / resolved)
     socket.on('sos_status_update', ({ sosId, status, responderId }) => {
       setAlerts((prev) =>
         prev.map((a) =>
@@ -81,12 +87,31 @@ const Responder = () => {
       );
     });
 
+    // ---- 🔍 Missing Persons board ----
+    socket.emit('get_missing_people'); // ask backend for current list
+
+    socket.on('load_missing_people', (data) => setMissingPeople(data));
+    socket.on('new_missing_person', (data) =>
+      setMissingPeople((prev) => [data, ...prev])
+    );
+    socket.on('update_missing_person', (updated) => {
+      setMissingPeople((prev) =>
+        prev.map((p) => (p._id === updated._id ? updated : p))
+      );
+    });
+
     return () => {
       if (watchId.current) navigator.geolocation.clearWatch(watchId.current);
+      socket.off('new_sos');
+      socket.off('sos_status_update');
+      socket.off('load_missing_people');
+      socket.off('new_missing_person');
+      socket.off('update_missing_person');
       clearTimeout(timer);
     };
   }, [myId]);
 
+  // ---- ETA helper text ----
   const calculateEtaDisplay = (alertLocation) => {
     if (!myLocation || !alertLocation) return 'Locating...';
     const distanceKm = getDistanceFromLatLonInKm(
@@ -103,7 +128,7 @@ const Responder = () => {
     return `${distanceKm.toFixed(1)} km`;
   };
 
-  // 🔴 LIVE GPS EMIT: includes sosId + responderId + location
+  // ---- Live GPS tracking ----
   const startLiveTracking = (sosId) => {
     if (!navigator.geolocation) return alert('GPS not supported');
     setActiveSOSId(sosId);
@@ -113,10 +138,8 @@ const Responder = () => {
         const { latitude, longitude } = pos.coords;
         const loc = { lat: latitude, lng: longitude };
         setMyLocation(loc);
-
         socket.emit('responder_location_update', {
           sosId,
-          responderId: myId,
           location: loc,
         });
       },
@@ -125,6 +148,7 @@ const Responder = () => {
     );
   };
 
+  // ---- Accept / Resolve ----
   const updateStatus = (id, newStatus) => {
     setAlerts((prev) =>
       prev.map((a) =>
@@ -167,7 +191,7 @@ const Responder = () => {
 
   return (
     <div className="flex h-screen bg-gray-900 text-white font-sans relative">
-      {/* LEFT: Alerts list + status */}
+      {/* LEFT COLUMN – LIST OF MISSIONS */}
       <div className="w-1/2 flex flex-col border-r border-gray-800">
         <div className="p-6 border-b border-gray-800 bg-gray-800 z-10">
           <div className="flex justify-between items-center mb-4">
@@ -192,6 +216,7 @@ const Responder = () => {
           </div>
         </div>
 
+        {/* Live tracking banner */}
         {activeSOSId && myProfile && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
@@ -205,6 +230,7 @@ const Responder = () => {
                   Broadcasting Live Location
                 </span>
               </div>
+
               {myLocation && (
                 <div className="text-right">
                   <p className="text-lg font-extrabold text-white">
@@ -216,6 +242,7 @@ const Responder = () => {
                 </div>
               )}
             </div>
+
             <div className="flex gap-4 text-xs text-gray-300 mt-2">
               <span className="flex items-center gap-1">
                 <Phone size={14} /> {myProfile.phone}
@@ -227,6 +254,7 @@ const Responder = () => {
           </motion.div>
         )}
 
+        {/* Mission cards */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900">
           <AnimatePresence>
             {myAlerts.length === 0 && (
@@ -323,6 +351,7 @@ const Responder = () => {
                       >
                         <Navigation size={20} /> GO
                       </motion.button>
+
                       <motion.button
                         initial={{ opacity: 0.8 }}
                         animate={{ opacity: 1 }}
@@ -331,6 +360,7 @@ const Responder = () => {
                       >
                         <Radio size={18} /> LIVE TRACKING ON
                       </motion.button>
+
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         onClick={() => updateStatus(alert._id, 'resolved')}
@@ -347,7 +377,7 @@ const Responder = () => {
         </div>
       </div>
 
-      {/* RIGHT: Map */}
+      {/* RIGHT COLUMN – MAP + missing persons overlay */}
       <div className="w-1/2 relative">
         <MapContainer
           center={[28.6139, 77.209]}
@@ -358,8 +388,6 @@ const Responder = () => {
             attribution="© OpenStreetMap contributors"
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-
-          {/* 🧍 Victim / SOS locations */}
           {myAlerts.map(
             (alert) =>
               alert.location && (
@@ -373,22 +401,54 @@ const Responder = () => {
                 </Marker>
               )
           )}
-
-          {/* 🚑 Responder's own live location (optional, nice to have) */}
-          {myLocation && (
-            <Marker position={[myLocation.lat, myLocation.lng]}>
-              <Popup>
-                <b>🚑 You (Responder)</b>
-              </Popup>
-            </Marker>
-          )}
         </MapContainer>
 
+        {/* Active missions counter */}
         <div className="absolute top-4 right-4 bg-gray-800/90 text-white p-3 rounded-lg shadow-xl text-xs border border-gray-700">
           <p className="font-bold">Total Active Missions:</p>
           <p className="text-2xl text-red-400">{myAlerts.length}</p>
         </div>
 
+        {/* NEW: Missing persons mini-board */}
+        {missingPeople.length > 0 && (
+          <div className="absolute bottom-4 left-4 right-4 bg-gray-900/90 border border-gray-700 rounded-xl p-3 shadow-xl max-h-52 overflow-x-auto">
+            <p className="text-xs font-bold text-gray-300 mb-2">
+              Missing Persons (for awareness)
+            </p>
+            <div className="flex gap-3 overflow-x-auto">
+              {missingPeople.map((p) => (
+                <div
+                  key={p._id}
+                  className="min-w-[140px] bg-gray-800 rounded-lg overflow-hidden border border-gray-700"
+                >
+                  <div className="h-24 bg-gray-700">
+                    {p.image ? (
+                      <img
+                        src={p.image}
+                        alt={p.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                        No photo
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2">
+                    <p className="text-xs font-bold text-white truncate">
+                      {p.name}, {p.age}
+                    </p>
+                    <p className="text-[10px] text-gray-400 truncate">
+                      Last seen: {p.lastSeen}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Chat with citizen */}
         {activeSOSId && (
           <div className="absolute bottom-8 left-8 z-[2000]">
             <ChatWindow

@@ -93,6 +93,7 @@ function MapClickHandler({ mode, onLocationSelect }) {
 
 const Admin = () => {
   const [isLoading, setIsLoading] = useState(true);
+
   const [alerts, setAlerts] = useState([]);
   const [broadcastMsg, setBroadcastMsg] = useState('');
   const [activeTab, setActiveTab] = useState('map');
@@ -105,8 +106,8 @@ const Admin = () => {
   const [activeChatSosId, setActiveChatSosId] = useState(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
 
-  // 🆕 store last known responder location per SOS
-  const [responderLocations, setResponderLocations] = useState({});
+  // NEW: Missing persons state
+  const [missingPeople, setMissingPeople] = useState([]);
 
   const activeAlerts = alerts.filter((a) => a.status !== 'resolved');
   const resolvedCount = alerts.filter((a) => a.status === 'resolved').length;
@@ -192,16 +193,6 @@ const Admin = () => {
       if (status === 'resolved' && activeChatSosId === sosId) setActiveChatSosId(null);
     });
 
-    // 🆕 LIVE responder location from Responder + Citizen
-    socket.on('live_responder_location', (data) => {
-      if (!data || !data.location) return;
-      const key = data.sosId || 'global';
-      setResponderLocations((prev) => ({
-        ...prev,
-        [key]: data.location,
-      }));
-    });
-
     // ---- Responders ----
     const fetchResponders = async () => {
       try {
@@ -219,13 +210,35 @@ const Admin = () => {
     };
     fetchResponders();
 
+    // ---- MISSING PERSONS (NEW) ----
+    socket.emit('get_missing_people');
+
+    socket.on('load_missing_people', (data) => {
+      if (Array.isArray(data)) setMissingPeople(data);
+    });
+
+    socket.on('new_missing_person', (data) => {
+      setMissingPeople((prev) => [data, ...prev]);
+    });
+
+    socket.on('update_missing_person', (updated) => {
+      setMissingPeople((prev) =>
+        prev.map((p) => (p._id === updated._id ? updated : p))
+      );
+    });
+
     return () => {
       socket.off('new_shelter');
       socket.off('shelter_updated');
       socket.off('shelter_deleted');
       socket.off('new_sos');
       socket.off('sos_status_update');
-      socket.off('live_responder_location');
+
+      // cleanup missing-person listeners
+      socket.off('load_missing_people');
+      socket.off('new_missing_person');
+      socket.off('update_missing_person');
+
       clearTimeout(timer);
     };
   }, [activeChatSosId]);
@@ -341,6 +354,13 @@ const Admin = () => {
             label="Safe Shelters"
             active={activeTab === 'shelters'}
             onClick={() => setActiveTab('shelters')}
+          />
+          {/* NEW TAB: Missing Persons */}
+          <SidebarItem
+            icon={<Users size={20} />}
+            label="Missing Persons"
+            active={activeTab === 'missing'}
+            onClick={() => setActiveTab('missing')}
           />
           <SidebarItem
             icon={<BarChart3 size={20} />}
@@ -518,7 +538,6 @@ const Admin = () => {
                         />
                       )}
 
-                      {/* 🏠 Shelters */}
                       {shelters.map((s) =>
                         s.lat && s.lng ? (
                           <Marker key={s.id} position={[s.lat, s.lng]}>
@@ -529,7 +548,6 @@ const Admin = () => {
                         ) : null
                       )}
 
-                      {/* 🆘 User / SOS markers */}
                       {activeAlerts.map((a) =>
                         a.location ? (
                           <Marker
@@ -579,20 +597,6 @@ const Admin = () => {
                           </Marker>
                         ) : null
                       )}
-
-                      {/* 🚑 Responder markers (live) */}
-                      {Object.entries(responderLocations).map(([key, loc]) =>
-                        loc && loc.lat && loc.lng ? (
-                          <Marker
-                            key={`responder-${key}`}
-                            position={[loc.lat, loc.lng]}
-                          >
-                            <Popup>
-                              <b>🚑 Responder (SOS: {key})</b>
-                            </Popup>
-                          </Marker>
-                        ) : null
-                      )}
                     </>
                   )}
                 </MapContainer>
@@ -633,7 +637,7 @@ const Admin = () => {
                   {isWarningActive ? (
                     <button
                       onClick={handleRemoveWarning}
-                      className="w-full p-3 bg-red-600 textwhite font-bold rounded hover:bg-red-700"
+                      className="w-full p-3 bg-red-600 text-white font-bold rounded hover:bg-red-700"
                     >
                       REMOVE WARNING
                     </button>
@@ -776,6 +780,53 @@ const Admin = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* NEW TAB: Missing Persons */}
+          {activeTab === 'missing' && (
+            <div className="bg-gray-800 p-6 rounded-xl h-full overflow-y-auto">
+              <h2 className="text-xl font-bold text-blue-400 mb-4">
+                Missing Persons Board
+              </h2>
+              {missingPeople.length === 0 && (
+                <p className="text-gray-400 text-sm">No reports yet.</p>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {missingPeople.map((person) => (
+                  <div
+                    key={person._id}
+                    className="bg-gray-900 rounded-xl overflow-hidden border border-gray-700 shadow-lg"
+                  >
+                    <div className="h-40 bg-gray-700 relative">
+                      {person.image ? (
+                        <img
+                          src={person.image}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-500">
+                          <Users size={32} />
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-2">
+                        <h3 className="text-md font-bold text-white">
+                          {person.name}, {person.age}
+                        </h3>
+                        <p className="text-xs text-gray-300">
+                          Last seen: {person.lastSeen || 'Unknown'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="p-3 text-sm text-gray-300">
+                      <p className="mb-2">{person.description}</p>
+                      <p className="text-xs text-gray-500">
+                        Reports: {person.comments?.length || 0}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
