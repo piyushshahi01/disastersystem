@@ -105,6 +105,9 @@ const Admin = () => {
   const [activeChatSosId, setActiveChatSosId] = useState(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
 
+  // 🆕 store last known responder location per SOS
+  const [responderLocations, setResponderLocations] = useState({});
+
   const activeAlerts = alerts.filter((a) => a.status !== 'resolved');
   const resolvedCount = alerts.filter((a) => a.status === 'resolved').length;
 
@@ -189,6 +192,16 @@ const Admin = () => {
       if (status === 'resolved' && activeChatSosId === sosId) setActiveChatSosId(null);
     });
 
+    // 🆕 LIVE responder location from Responder + Citizen
+    socket.on('live_responder_location', (data) => {
+      if (!data || !data.location) return;
+      const key = data.sosId || 'global';
+      setResponderLocations((prev) => ({
+        ...prev,
+        [key]: data.location,
+      }));
+    });
+
     // ---- Responders ----
     const fetchResponders = async () => {
       try {
@@ -212,6 +225,7 @@ const Admin = () => {
       socket.off('shelter_deleted');
       socket.off('new_sos');
       socket.off('sos_status_update');
+      socket.off('live_responder_location');
       clearTimeout(timer);
     };
   }, [activeChatSosId]);
@@ -504,6 +518,7 @@ const Admin = () => {
                         />
                       )}
 
+                      {/* 🏠 Shelters */}
                       {shelters.map((s) =>
                         s.lat && s.lng ? (
                           <Marker key={s.id} position={[s.lat, s.lng]}>
@@ -514,6 +529,7 @@ const Admin = () => {
                         ) : null
                       )}
 
+                      {/* 🆘 User / SOS markers */}
                       {activeAlerts.map((a) =>
                         a.location ? (
                           <Marker
@@ -563,6 +579,20 @@ const Admin = () => {
                           </Marker>
                         ) : null
                       )}
+
+                      {/* 🚑 Responder markers (live) */}
+                      {Object.entries(responderLocations).map(([key, loc]) =>
+                        loc && loc.lat && loc.lng ? (
+                          <Marker
+                            key={`responder-${key}`}
+                            position={[loc.lat, loc.lng]}
+                          >
+                            <Popup>
+                              <b>🚑 Responder (SOS: {key})</b>
+                            </Popup>
+                          </Marker>
+                        ) : null
+                      )}
                     </>
                   )}
                 </MapContainer>
@@ -603,7 +633,7 @@ const Admin = () => {
                   {isWarningActive ? (
                     <button
                       onClick={handleRemoveWarning}
-                      className="w-full p-3 bg-red-600 text-white font-bold rounded hover:bg-red-700"
+                      className="w-full p-3 bg-red-600 textwhite font-bold rounded hover:bg-red-700"
                     >
                       REMOVE WARNING
                     </button>
