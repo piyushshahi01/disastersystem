@@ -186,7 +186,9 @@ const Admin = () => {
         {/* STATS HEADER */}
         <div className="bg-gray-900 p-6 shadow-md grid grid-cols-4 gap-6 border-b border-gray-800">
           <StatCard title="Total Solved" value={resolvedCount} color="text-green-500" icon={<CheckCircle/>} />
-          <StatCard title="Active SOS" value={activeAlerts.filter(a => a.type === 'EMERGENCY').length} color="text-red-500" icon={<AlertTriangle/>} />
+          <StatCard title="Active SOS" value={activeAlerts.length} color="text-red-500" icon={<AlertTriangle/>}
+/>
+
           <StatCard title="Responders" value={realResponders.length} color="text-blue-500" icon={<Users/>} />
           <StatCard title="Shelters" value={shelters.length} color="text-purple-500" icon={<Home/>} />
         </div>
