@@ -9,7 +9,7 @@ const HeatmapLayer = ({ points }) => {
   useEffect(() => {
     if (!points || points.length === 0) return;
 
-    // Create the heatmap layer
+   
     const heat = L.heatLayer(points, {
       radius: 30, // Size of the glow
       blur: 20,   // Softness of the glow
@@ -20,11 +20,11 @@ const HeatmapLayer = ({ points }) => {
         0.6: 'cyan',
         0.7: 'lime',
         0.8: 'yellow',
-        1.0: 'red' // High density = Red
+        1.0: 'red' 
       }
     }).addTo(map);
 
-    // Cleanup when component unmounts or points change
+    
     return () => {
       map.removeLayer(heat);
     };

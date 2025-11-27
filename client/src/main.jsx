@@ -23,6 +23,9 @@ L.Icon.Default.mergeOptions({
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    {/* Wrap the App component with the LanguageProvider */}
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
   </React.StrictMode>,
 )

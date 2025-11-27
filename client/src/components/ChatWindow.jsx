@@ -9,24 +9,24 @@ const ChatWindow = ({ socket, sosId, userName, role }) => {
 
     useEffect(() => {
         if (sosId) {
-            // Reset messages when switching rooms
+           
             setMessages([]); 
             socket.emit("join_room", sosId);
         }
         
-        // 1. Listen for LIVE messages
+       
         const handleMessage = (data) => {
             setMessages((prev) => [...prev, data]);
         };
 
-        // 2. Listen for HISTORY (This fixes the Admin Blank Screen)
+        
         const handleHistory = (history) => {
-            console.log("History loaded:", history); // Debug log
+            console.log("History loaded:", history); 
             setMessages(history);
         };
 
         socket.on("receive_message", handleMessage);
-        socket.on("load_messages", handleHistory); // <--- CRITICAL FIX
+        socket.on("load_messages", handleHistory); 
 
         return () => {
             socket.off("receive_message", handleMessage);
@@ -34,7 +34,7 @@ const ChatWindow = ({ socket, sosId, userName, role }) => {
         };
     }, [socket, sosId]);
 
-    // Auto-scroll to bottom
+    
     useEffect(() => {
         scrollRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
@@ -50,7 +50,7 @@ const ChatWindow = ({ socket, sosId, userName, role }) => {
             };
 
             await socket.emit("send_message", messageData);
-            // Optimistic update (Show immediately for sender)
+        
             setMessages((prev) => [...prev, messageData]);
             setCurrentMessage("");
         }

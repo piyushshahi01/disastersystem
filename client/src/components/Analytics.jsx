@@ -3,34 +3,27 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Shield, AlertTriangle, Clock, Activity, CheckCircle } from 'lucide-react';
 
 const Analytics = ({ alerts, shelters, responders }) => {
-
-  // --- 1. DATA PREPARATION ---
-  
-  // FILTERING
   const activeAlerts = alerts.filter(a => a.status !== 'resolved');
   const resolvedAlerts = alerts.filter(a => a.status === 'resolved');
 
-  // Chart 1: Resolution Status (NEW)
   const resolutionData = [
     { name: 'Active', value: activeAlerts.length },
     { name: 'Solved', value: resolvedAlerts.length },
   ];
   const RES_COLORS = ['#EF4444', '#10B981']; // Red (Active), Green (Solved)
 
-  // Chart 2: Incident Types (Based on ALL data)
+  
   const incidentTypeData = [
     { name: 'Emergency (SOS)', value: alerts.filter(a => a.type === 'EMERGENCY').length },
     { name: 'Reported Incidents', value: alerts.filter(a => a.type === 'INCIDENT').length },
   ];
   const TYPE_COLORS = ['#F59E0B', '#3B82F6']; // Orange, Blue
 
-  // Chart 3: Shelter Capacity
   const shelterData = shelters.map(s => ({
     name: s.name.split(' ')[0], 
     capacity: s.capacity
   }));
 
-  // Chart 4: Activity (Mocked)
   const activityData = [
     { time: '10 AM', sos: 2, reports: 1 },
     { time: '12 PM', sos: 1, reports: 0 },

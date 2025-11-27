@@ -73,7 +73,7 @@ const Responder = () => {
     };
     fetchAlerts();
 
-    // New SOS coming in
+    
     socket.on('new_sos', (data) => {
       if (data && data.user) setAlerts((prev) => [data, ...prev]);
     });
